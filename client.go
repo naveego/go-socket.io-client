@@ -1,6 +1,7 @@
 package socketio_client
 
 import (
+	"errors"
 	"net/url"
 	"path"
 	"reflect"
@@ -11,7 +12,8 @@ import (
 type Options struct {
 	Transport string            //protocol name string,websocket polling...
 	Query     map[string]string //url的附加的参数
-	Header 	  map[string][]string
+	Header    map[string][]string
+	Namespace string
 }
 
 type Client struct {
@@ -19,11 +21,12 @@ type Client struct {
 
 	conn *clientConn
 
-	eventsLock sync.RWMutex
-	events     map[string]*caller
-	acks       map[int]*caller
-	id         int
-	namespace  string
+	eventsLock   sync.RWMutex
+	events       map[string]*caller
+	acks         map[int]*caller
+	id           int
+	namespace    string
+	gotNamespace func()
 }
 
 func NewClient(uri string, opts *Options) (client *Client, err error) {
@@ -32,6 +35,13 @@ func NewClient(uri string, opts *Options) (client *Client, err error) {
 	if err != nil {
 		return
 	}
+
+	connectToNamespace := opts.Namespace != "" && opts.Namespace != "/"
+	if connectToNamespace && !strings.HasPrefix(opts.Namespace, "/") {
+		err = errors.New("namespace must start with '/'")
+		return
+	}
+
 	url.Path = path.Join("/socket.io", url.Path)
 	url.Path = url.EscapedPath()
 	if strings.HasSuffix(url.Path, "socket.io") {
@@ -52,11 +62,24 @@ func NewClient(uri string, opts *Options) (client *Client, err error) {
 		opts: opts,
 		conn: socket,
 
-		events: make(map[string]*caller),
-		acks:   make(map[int]*caller),
+		events:    make(map[string]*caller),
+		acks:      make(map[int]*caller),
+		namespace: opts.Namespace,
 	}
 
 	go client.readLoop()
+
+	if connectToNamespace {
+		awaitingNamespace := make(chan string)
+		var once sync.Once
+		client.gotNamespace = func() {
+			once.Do(func() {
+				close(awaitingNamespace)
+			})
+		}
+		client.sendConnect()
+		<-awaitingNamespace
+	}
 
 	return
 }
@@ -228,9 +251,10 @@ func (client *Client) readLoop() error {
 		}
 		switch p.Type {
 		case _CONNECT:
+			if client.gotNamespace != nil {
+				client.gotNamespace()
+			}
 			client.namespace = p.NSP
-			// !!!下面这个不能有，否则会有死循环
-			//client.sendConnect()
 		case _BINARY_EVENT:
 			fallthrough
 		case _EVENT:

@@ -4,7 +4,11 @@ go-socket.io-client is an client implementation of [socket.io](http://socket.io)
 
 It is compatible with latest implementation of socket.io in node.js, and supports namespace.
 
+## *_This fork actually does support namespaces_*
+
 * It is base on [googollee/go-socket.io](https://github.com/googollee/go-socket.io) and [googollee/go-engine.io](https://github.com/googollee/go-engine.io)
+
+
 
 ## Install
 
@@ -41,6 +45,7 @@ func main() {
 	opts := &socketio_client.Options{
 		Transport: "websocket",
 		Query:     make(map[string]string),
+		Namespace: "/ns",
 	}
 	opts.Query["user"] = "user"
 	opts.Query["pwd"] = "pass"
