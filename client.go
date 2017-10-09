@@ -25,6 +25,7 @@ type Client struct {
 	events       map[string]*caller
 	acks         map[int]*caller
 	id           int
+	clientID     string
 	namespace    string
 	gotNamespace func()
 }
@@ -59,9 +60,9 @@ func NewClient(uri string, opts *Options) (client *Client, err error) {
 	}
 
 	client = &Client{
-		opts: opts,
-		conn: socket,
-
+		opts:      opts,
+		conn:      socket,
+		clientID:  socket.id,
 		events:    make(map[string]*caller),
 		acks:      make(map[int]*caller),
 		namespace: opts.Namespace,
@@ -84,6 +85,10 @@ func NewClient(uri string, opts *Options) (client *Client, err error) {
 	return
 }
 
+// ID returns the ID of this client.
+func (client *Client) ID() string {
+	return client.clientID
+}
 func (client *Client) On(message string, f interface{}) (err error) {
 	c, err := newCaller(f)
 	if err != nil {
