@@ -80,6 +80,7 @@ func NewClient(uri string, opts *Options) (client *Client, err error) {
 		}
 		client.sendConnect()
 		<-awaitingNamespace
+		client.clientID = client.namespace + "#" + client.clientID
 	}
 
 	return
